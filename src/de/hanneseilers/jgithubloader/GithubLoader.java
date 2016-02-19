@@ -43,13 +43,13 @@ public class GithubLoader {
 		if( hasUpdate(currentTag) ){
 			RepositoryTag vUpdateTag = getLatestTag();
 			
-			System.out.println( "has update" );
-			
 			// download
-			File vTmpZipFile = download( vUpdateTag.getZipballUrl() );
+			//File vTmpZipFile = download( vUpdateTag.getZipballUrl() );
+			File vTmpZipFile = new File( "tmp/source.zip" );
 			if( vTmpZipFile == null )
 				throw new UpdateFailedException( "Failed to download source code from " + vUpdateTag.getZipballUrl() );
 					
+
 			// unzip
 			File vTmpDir = new File( TMP_DIR );
 			try {
@@ -64,7 +64,7 @@ public class GithubLoader {
 			if( vJarFile == null )
 				throw new UpdateFailedException( "Cannot build jar file from project source at " + vTmpDir.getPath() );
 			
-			System.out.println( "build new jar" );
+			System.out.println( "build new jar " + vJarFile.getPath() );
 				
 			// TODO: replace
 				
@@ -182,22 +182,33 @@ public class GithubLoader {
 				File vNewFile = new File( destination + File.separator + vZipEntry.getName() );
 				
 				// create all non exists directories
-				new File(vNewFile.getParent()).mkdirs();
+				new File( vNewFile.getParent() ).mkdirs();
 				
-				// get file stream
-				FileOutputStream vFileOutputStream = new FileOutputStream(vNewFile);
+				// check if entry is file or directory
+				if( vZipEntry.isDirectory() ){
+					
+					vNewFile.mkdir();
+					
+				} else {
 				
-				// read file from input stream and write to output stream
-				int vLength;
-				while( (vLength = vZipInputStream.read(vBuffer)) > 0 ){
-					vFileOutputStream.write(vBuffer, 0, vLength);
+					// get file stream
+					FileOutputStream vFileOutputStream = new FileOutputStream(vNewFile);
+					
+					// read file from input stream and write to output stream
+					int vLength;
+					while( (vLength = vZipInputStream.read(vBuffer)) > 0 ){
+						vFileOutputStream.write(vBuffer, 0, vLength);
+					}
+					
+					// close output file
+					vFileOutputStream.close();
+					
 				}
 				
-				// close all streams
-				vFileOutputStream.close();
-				vZipInputStream.close();
-				
 			}
+			
+			// close input stream
+			vZipInputStream.close();
 			
 			return true;
 			
@@ -210,18 +221,28 @@ public class GithubLoader {
 	}
 	
 	/**
-	 * Checks if directory has ant build file.
+	 * tries to find ant build directory.
 	 * @param directory	{@link File} directory to search in.
-	 * @return			{@code true} if build file is in directory, {@code false} otherwise.
+	 * @return			{@link File} directory where ant build file is located,
+	 * 					{@code null} if no ant build file was found.
 	 */
-	private boolean hasAntBuildFile(File directory){
+	private File getAntBuildDirectory(File directory){
 		if( directory.isDirectory() ){
 			for( File vFile : directory.listFiles() ){
-				if( vFile.getName().equals("build.xml") )
-					return true;
+
+				// check if file is directory or normal file
+				if( vFile.isDirectory() ){					
+					File vRetDeepSearch = getAntBuildDirectory( vFile );
+					if( vRetDeepSearch != null )
+						return vRetDeepSearch;					
+				} else if ( vFile.getName().equals("build.xml") ){
+					return directory;					
+				}
+				
 			}
 		}
-		return false;
+		
+		return null;
 	}
 	
 	/**
@@ -236,7 +257,8 @@ public class GithubLoader {
 			String vCommand = "";
 			
 			// check if to build with ant
-			if( hasAntBuildFile(source) )
+			File vDirectory = null;
+			if( (vDirectory = getAntBuildDirectory(source)) != null )
 				vCommand = "ant";
 			
 			// run build command
@@ -244,14 +266,14 @@ public class GithubLoader {
 				
 				// start process
 				ProcessBuilder vProcessBuilder = new ProcessBuilder( vCommand );
-				vProcessBuilder.directory( source );
+				vProcessBuilder.directory( vDirectory );
 				Process vProcess = vProcessBuilder.start();
 				
 				// wait util build process finished
 				vProcess.waitFor();
 				
 				// find jar file
-				for( File vFile : source.listFiles() ){
+				for( File vFile : vDirectory.listFiles() ){
 					if( vFile.getName().endsWith(".jar") )
 						return vFile;
 				}

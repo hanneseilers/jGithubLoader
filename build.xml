@@ -12,7 +12,6 @@
                 <attribute name="Main-Class" value="de.hanneseilers.jgithubloader.Test"/>
                 <attribute name="Class-Path" value="."/>
             </manifest>
-            <fileset dir="${dir.jarfile}/bin"/>
             <zipfileset excludes="META-INF/*.SF" src="${dir.jarfile}/org.eclipse.egit.github.core-4.3.0-SNAPSHOT.jar"/>
         </jar>
     </target>
