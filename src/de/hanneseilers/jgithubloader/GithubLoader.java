@@ -44,8 +44,8 @@ public class GithubLoader {
 			RepositoryTag vUpdateTag = getLatestTag();
 			
 			// download
-			//File vTmpZipFile = download( vUpdateTag.getZipballUrl() );
-			File vTmpZipFile = new File( "tmp/source.zip" );
+			File vTmpZipFile = download( vUpdateTag.getZipballUrl() );
+//			File vTmpZipFile = new File( "tmp/source.zip" );
 			if( vTmpZipFile == null )
 				throw new UpdateFailedException( "Failed to download source code from " + vUpdateTag.getZipballUrl() );
 					
