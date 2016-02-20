@@ -7,9 +7,13 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -17,6 +21,8 @@ import java.util.zip.ZipInputStream;
 import org.eclipse.egit.github.core.Repository;
 import org.eclipse.egit.github.core.RepositoryTag;
 import org.eclipse.egit.github.core.service.RepositoryService;
+
+import de.hanneseilers.jgithubloader.UpdateProgressChangedListener.UpdateProgress;
 
 /**
  * GithubLoader
@@ -29,11 +35,50 @@ public class GithubLoader {
 	private static final String TMP_ZIP = "source.zip";
 	
 	private String mGitUser;
-	private String mGitRepository;
+	private String mGitRepository;	
+	private List<UpdateProgressChangedListener> mListener = new ArrayList<UpdateProgressChangedListener>();
 	
+	
+	/**
+	 * Constructor
+	 * @param gitUser			{@link String} username of applications repository
+	 * @param gitRepository		{@link String} repository name
+	 */
 	public GithubLoader( String gitUser, String gitRepository ){
 		mGitUser = gitUser;
 		mGitRepository = gitRepository;		
+	}
+	
+	/**
+	 * Adds a {@link UpdateProgressChangedListener}.
+	 * @param listener	{@link UpdateProgressChangedListener} to add.
+	 */
+	public void addUpdateProgressChangedListener(UpdateProgressChangedListener listener){
+		if( !mListener.contains(listener) )
+			mListener.add( listener );
+	}
+	
+	/**
+	 * Removes a {@link UpdateProgressChangedListener}.
+	 * @param listener	{@link UpdateProgressChangedListener} to remove.
+	 */
+	public void remoteUpdateProgressChangedListener(UpdateProgressChangedListener listener){
+		mListener.remove( listener );
+	}
+	
+	/**
+	 * Notifies all listeners about {@link UpdateProgress} changes.
+	 * @param progress	Current {@link UpdateProgress}.
+	 */
+	private void notifyUpdateProgressChanged(final UpdateProgress progress){
+		for( final UpdateProgressChangedListener vListener : mListener ){
+			new Thread( new Runnable() {				
+				@Override
+				public void run() {
+					vListener.onUpdateProgressChanged( progress );
+				}
+			} ).start();
+		}
 	}
 	
 	/**
@@ -42,6 +87,23 @@ public class GithubLoader {
 	 * @throws UpdateFailedException 
 	 */
 	public void update(String currentTag) throws UpdateFailedException{
+		try{
+			
+			updateIntern( currentTag );
+			notifyUpdateProgressChanged( UpdateProgress.DONE );
+			
+		} catch(UpdateFailedException e){
+			notifyUpdateProgressChanged( UpdateProgress.FAILED );
+			throw new UpdateFailedException( e.getMessage() );
+		}
+	}
+	
+	/**
+	 * Updates the application, if new tag is available in repository. (Internal version)
+	 * @param currentTag	{@link String} name of currently installed tag.
+	 * @throws UpdateFailedException 
+	 */
+	private void updateIntern(String currentTag) throws UpdateFailedException{
 		if( hasUpdate(currentTag) ){
 			RepositoryTag vUpdateTag = getLatestTag();
 			
@@ -65,12 +127,14 @@ public class GithubLoader {
 			File vJarFile = build( vTmpDir );
 			if( vJarFile == null )
 				throw new UpdateFailedException( "Cannot build jar file from project source at " + vTmpDir.getPath() );
-			
-			System.out.println( "build new jar " + vJarFile.getPath() );
 				
-			// TODO: replace
+			// replace old jar with new one
+			if( !replace(vJarFile) )
+				throw new UpdateFailedException( "Cannot update application using " + vJarFile.getPath() );
 				
-			// TODO: reboot
+			// reboot
+			if( !restartApplication() )
+				throw new UpdateFailedException( "Cannot restart application" );
 		}
 	}
 	
@@ -79,8 +143,8 @@ public class GithubLoader {
 	 * @param currentTag	{@link String} name of currently installed tag.
 	 * @return				{@code true} if new tag is available, {@code false} otherwise.
 	 */
-	private boolean hasUpdate(String currentTag){
-		
+	private boolean hasUpdate(String currentTag){		
+		notifyUpdateProgressChanged( UpdateProgress.CHECK );
 		RepositoryTag vLatestTag = getLatestTag();
 		if( vLatestTag != null && !vLatestTag.getName().equals(currentTag) )
 			return true;
@@ -94,8 +158,7 @@ public class GithubLoader {
 	 * @param gitRepository
 	 * @return
 	 */
-	private RepositoryTag getLatestTag(){
-		
+	private RepositoryTag getLatestTag(){		
 		try {
 			
 			RepositoryService vService = new RepositoryService();
@@ -110,8 +173,7 @@ public class GithubLoader {
 			e.printStackTrace();
 		}
 		
-		return null;
-		
+		return null;		
 	}
 	
 	/**
@@ -122,6 +184,8 @@ public class GithubLoader {
 	private File download( String url ){
 		
 		try{
+			
+			notifyUpdateProgressChanged( UpdateProgress.DOWNLOAD );
 			
 			// create temporary directory
 			File vTmpDir = new File( TMP_DIR );
@@ -164,6 +228,8 @@ public class GithubLoader {
 		byte[] vBuffer = new byte[1024];
 		
 		try {
+			
+			notifyUpdateProgressChanged( UpdateProgress.UNPACK );
 			
 			// create destination directory		
 			if( !destination.exists() )
@@ -256,6 +322,8 @@ public class GithubLoader {
 		
 		try{
 			
+			notifyUpdateProgressChanged( UpdateProgress.BUILD );
+			
 			String vCommand = "";
 			
 			// check if to build with ant
@@ -296,6 +364,69 @@ public class GithubLoader {
 		}
 		
 		return null;
+	}
+	
+	/**
+	 * Replaces current jar file with another jar file
+	 * @param jarFile	{@link File} to use for replacing current jar file
+	 * @return
+	 */
+	private boolean replace(File jarFile){
+		
+		try{
+			
+			notifyUpdateProgressChanged( UpdateProgress.UPDATE );
+			
+			File vOldFile = new File( GithubLoader.class.getProtectionDomain().getCodeSource().getLocation().getPath() );
+			
+			if( vOldFile.getPath().endsWith(".jar")
+					&& jarFile.getPath().endsWith(".jar") ){
+				
+				Files.copy( jarFile.toPath(), vOldFile.toPath(), StandardCopyOption.REPLACE_EXISTING );
+				return true;
+				
+			}
+			
+		} catch( IOException e ){
+			e.printStackTrace();
+		}
+		
+		return false;
+	}
+	
+	/**
+	 * Retsrats application
+	 * @return	{@code false} if restart failed.
+	 */
+	public boolean restartApplication(){
+		try{
+				
+			notifyUpdateProgressChanged( UpdateProgress.RESTART );
+			
+			final String javaBin = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
+			final File currentJar = new File( GithubLoader.class.getProtectionDomain().getCodeSource().getLocation().toURI() );
+	
+			/* is it a jar file? */
+			if(!currentJar.getName().endsWith(".jar"))
+				return false;
+			
+			/* Build command: java -jar application.jar */
+			final ArrayList<String> command = new ArrayList<String>();
+			command.add(javaBin);
+			command.add("-jar");
+			command.add(currentJar.getPath());
+			
+			final ProcessBuilder builder = new ProcessBuilder(command);
+			builder.start();
+			System.exit(0);
+			
+		} catch(IOException e){
+			e.printStackTrace();
+		} catch(URISyntaxException e) {
+			e.printStackTrace();
+		}
+		
+		return false;
 	}
 	
 }
