@@ -18,7 +18,7 @@ public class Test implements UpdateProgressChangedListener {
 			Test vTest = new Test();			
 			GithubLoader loader = new GithubLoader("hanneseilers", "jGithubLoader");
 			loader.addUpdateProgressChangedListener( vTest );
-			loader.update( "v0.0.0" );
+			loader.update( "v0.0.3a" );
 			
 		} catch (UpdateFailedException e) {
 			e.printStackTrace();
