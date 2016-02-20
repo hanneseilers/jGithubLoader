@@ -1,10 +1,13 @@
 package de.hanneseilers.jgithubloader;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URL;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
@@ -99,7 +102,7 @@ public class GithubLoader {
 			RepositoryService vService = new RepositoryService();
 			Repository vRepository;		
 			vRepository = vService.getRepository( mGitUser, mGitRepository);
-			List<RepositoryTag> vTags = vService.getTags(vRepository);
+			final List<RepositoryTag> vTags = vService.getTags(vRepository);
 			
 			if( vTags.size() > 0 )
 				return vTags.get(0);
@@ -268,6 +271,13 @@ public class GithubLoader {
 				ProcessBuilder vProcessBuilder = new ProcessBuilder( vCommand );
 				vProcessBuilder.directory( vDirectory );
 				Process vProcess = vProcessBuilder.start();
+				
+				BufferedReader vBufferedReader = new BufferedReader(
+						new InputStreamReader( vProcess.getInputStream() ) );
+				String vLine;
+				while( (vLine = vBufferedReader.readLine()) != null ){
+					System.out.println(vLine);
+				}
 				
 				// wait util build process finished
 				vProcess.waitFor();
