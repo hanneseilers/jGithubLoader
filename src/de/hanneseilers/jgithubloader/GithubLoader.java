@@ -133,7 +133,9 @@ public class GithubLoader {
 				}
 			} ).start();
 			
-			mSplashScreen.show();
+			if( mUseSplash ){
+				mSplashScreen.show();
+			}
 			
 	}
 	
