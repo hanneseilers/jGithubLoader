@@ -8,10 +8,6 @@
     <property name="dir.jarfile" value="${dir.buildfile}"/>
     <target name="create_run_jar">
         <jar destfile="${dir.jarfile}/jGithubLoader.jar" filesetmanifest="mergewithoutmain">
-            <manifest>
-                <attribute name="Main-Class" value="de.hanneseilers.jgithubloader.Test"/>
-                <attribute name="Class-Path" value="."/>
-            </manifest>
             <zipfileset excludes="META-INF/*.SF" src="${dir.jarfile}/lib/org.eclipse.egit.github.core-4.3.0-SNAPSHOT.jar"/>
         </jar>
     </target>

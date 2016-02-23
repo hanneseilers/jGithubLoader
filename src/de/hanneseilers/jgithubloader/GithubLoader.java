@@ -23,6 +23,7 @@ import org.eclipse.egit.github.core.RepositoryTag;
 import org.eclipse.egit.github.core.service.RepositoryService;
 
 import de.hanneseilers.jgithubloader.UpdateProgressChangedListener.UpdateProgress;
+import de.hanneseilers.jgithubloader.splash.SplashScreen;
 
 /**
  * GithubLoader
@@ -35,18 +36,39 @@ public class GithubLoader {
 	private static final String TMP_ZIP = "source.zip";
 	
 	private String mGitUser;
-	private String mGitRepository;	
+	private String mGitRepository;
+	private boolean mUseSplash = false;
+	private SplashScreen mSplashScreen;
 	private List<UpdateProgressChangedListener> mListener = new ArrayList<UpdateProgressChangedListener>();
 	
-	
 	/**
-	 * Constructor
+	 * Constructor without splash screen.
 	 * @param gitUser			{@link String} username of applications repository
 	 * @param gitRepository		{@link String} repository name
 	 */
 	public GithubLoader( String gitUser, String gitRepository ){
+		this( gitUser, gitRepository, false );
+	}
+	
+	/**
+	 * Constructor with slapsh screen.
+	 * @param gitUser			{@link String} username of applications repository
+	 * @param gitRepository		{@link String} repository name
+	 * @param useSlpash			If {@code true} splash screen is used
+	 */
+	public GithubLoader( String gitUser, String gitRepository, boolean useSlpash ){
 		mGitUser = gitUser;
-		mGitRepository = gitRepository;		
+		mGitRepository = gitRepository;
+		mUseSplash = useSlpash;
+	}
+	
+	/**
+	 * Sets application nameon splash screen.
+	 * @param appName	{@link String} of application name.
+	 */
+	public void setAppName(String appName){
+		if( mSplashScreen != null )
+			mSplashScreen.setAppName( appName );
 	}
 	
 	/**
@@ -84,18 +106,35 @@ public class GithubLoader {
 	/**
 	 * Updates the application, if new tag is available in repository.
 	 * @param currentTag	{@link String} name of currently installed tag.
-	 * @throws UpdateFailedException 
 	 */
-	public void update(String currentTag) throws UpdateFailedException{
-		try{
+	public void update(final String currentTag){
+		
+			if( mUseSplash ){
+				mSplashScreen = new SplashScreen();
+				addUpdateProgressChangedListener( mSplashScreen );
+			}
+		
+			new Thread( new Runnable() {				
+				@Override
+				public void run() {
+					try{
+						
+						updateIntern( currentTag );
+						notifyUpdateProgressChanged( UpdateProgress.DONE );
+						
+					} catch(UpdateFailedException e){
+						notifyUpdateProgressChanged( UpdateProgress.FAILED );
+					}
+					
+					remoteUpdateProgressChangedListener( mSplashScreen );
+					
+					if( mSplashScreen != null )
+						mSplashScreen.exit();
+				}
+			} ).start();
 			
-			updateIntern( currentTag );
-			notifyUpdateProgressChanged( UpdateProgress.DONE );
+			mSplashScreen.show();
 			
-		} catch(UpdateFailedException e){
-			notifyUpdateProgressChanged( UpdateProgress.FAILED );
-			throw new UpdateFailedException( e.getMessage() );
-		}
 	}
 	
 	/**
@@ -416,8 +455,11 @@ public class GithubLoader {
 			command.add("-jar");
 			command.add(currentJar.getPath());
 			
+			if( mSplashScreen != null )
+				mSplashScreen.exit();
+			
 			final ProcessBuilder builder = new ProcessBuilder(command);
-			builder.start();
+			builder.start();			
 			System.exit(0);
 			
 		} catch(IOException e){

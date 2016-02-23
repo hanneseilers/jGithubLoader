@@ -2,6 +2,8 @@ package de.hanneseilers.jgithubloader;
 
 public class Test implements UpdateProgressChangedListener {
 	
+	public static final String TAGNAME = "v0.0.3a";
+	
 	@Override
 	public void onUpdateProgressChanged(UpdateProgress progress) {
 		System.out.println( "update progress: " + progress.name() );
@@ -13,16 +15,13 @@ public class Test implements UpdateProgressChangedListener {
 	 * @param args
 	 */
 	public static void main(String[] args) {		
-		try {
-			
-			Test vTest = new Test();			
-			GithubLoader loader = new GithubLoader("hanneseilers", "jGithubLoader");
-			loader.addUpdateProgressChangedListener( vTest );
-			loader.update( "v0.0.3a" );
-			
-		} catch (UpdateFailedException e) {
-			e.printStackTrace();
-		}
+		System.out.println( "Current Version: " + TAGNAME );
+		
+		Test vTest = new Test();			
+		GithubLoader loader = new GithubLoader("hanneseilers", "jGithubLoader", true);
+		loader.setAppName( "jGithubLoader - Test" );
+		loader.addUpdateProgressChangedListener( vTest );
+		loader.update( TAGNAME );
 	}
 
 }
