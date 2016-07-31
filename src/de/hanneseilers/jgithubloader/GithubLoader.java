@@ -84,7 +84,7 @@ public class GithubLoader {
 	 * Removes a {@link UpdateProgressChangedListener}.
 	 * @param listener	{@link UpdateProgressChangedListener} to remove.
 	 */
-	public void remoteUpdateProgressChangedListener(UpdateProgressChangedListener listener){
+	public void removeUpdateProgressChangedListener(UpdateProgressChangedListener listener){
 		mListener.remove( listener );
 	}
 	
@@ -126,7 +126,7 @@ public class GithubLoader {
 						notifyUpdateProgressChanged( UpdateProgress.FAILED );
 					}
 					
-					remoteUpdateProgressChangedListener( mSplashScreen );
+					removeUpdateProgressChangedListener( mSplashScreen );
 					
 					if( mSplashScreen != null )
 						mSplashScreen.exit();
